@@ -28,6 +28,7 @@ type OpenAiChatMessage = {
   role?: unknown;
   content?: unknown;
   name?: unknown;
+  cache_control?: unknown;
 };
 
 type OpenAiChatCompletionRequest = {
@@ -45,6 +46,7 @@ function buildAgentCommandInput(params: {
   prompt: { message: string; extraSystemPrompt?: string };
   sessionKey: string;
   runId: string;
+  streamParams?: { cacheRetention?: string };
 }) {
   return {
     message: params.prompt.message,
@@ -54,6 +56,7 @@ function buildAgentCommandInput(params: {
     deliver: false as const,
     messageChannel: "webchat" as const,
     bestEffortDeliver: false as const,
+    streamParams: params.streamParams,
   };
 }
 
@@ -123,11 +126,13 @@ function extractTextContent(content: unknown): string {
 function buildAgentPrompt(messagesUnknown: unknown): {
   message: string;
   extraSystemPrompt?: string;
+  hasCacheControl?: boolean;
 } {
   const messages = asMessages(messagesUnknown);
 
   const systemParts: string[] = [];
   const conversationEntries: ConversationEntry[] = [];
+  let hasCacheControl = false;
 
   for (const msg of messages) {
     if (!msg || typeof msg !== "object") {
@@ -140,6 +145,10 @@ function buildAgentPrompt(messagesUnknown: unknown): {
     }
     if (role === "system" || role === "developer") {
       systemParts.push(content);
+      // Detect cache_control on system messages
+      if (msg.cache_control && typeof msg.cache_control === "object") {
+        hasCacheControl = true;
+      }
       continue;
     }
 
@@ -169,6 +178,7 @@ function buildAgentPrompt(messagesUnknown: unknown): {
   return {
     message,
     extraSystemPrompt: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
+    hasCacheControl,
   };
 }
 
@@ -243,6 +253,7 @@ export async function handleOpenAiHttpRequest(
     prompt,
     sessionKey,
     runId,
+    streamParams: prompt.hasCacheControl ? { cacheRetention: "short" } : undefined,
   });
 
   if (!stream) {
