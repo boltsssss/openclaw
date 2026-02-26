@@ -43,6 +43,7 @@ type OpenAiChatMessage = {
   role?: unknown;
   content?: unknown;
   name?: unknown;
+  cache_control?: unknown;
 };
 
 type OpenAiChatCompletionRequest = {
@@ -105,6 +106,7 @@ function buildAgentCommandInput(params: {
   sessionKey: string;
   runId: string;
   messageChannel: string;
+  streamParams?: { cacheRetention?: string };
 }) {
   return {
     message: params.prompt.message,
@@ -117,6 +119,7 @@ function buildAgentCommandInput(params: {
     bestEffortDeliver: false as const,
     // HTTP API callers are authenticated operator clients for this gateway context.
     senderIsOwner: true as const,
+    streamParams: params.streamParams,
   };
 }
 
@@ -324,11 +327,13 @@ function buildAgentPrompt(
 ): {
   message: string;
   extraSystemPrompt?: string;
+  hasCacheControl?: boolean;
 } {
   const messages = asMessages(messagesUnknown);
 
   const systemParts: string[] = [];
   const conversationEntries: ConversationEntry[] = [];
+  let hasCacheControl = false;
 
   for (const [i, msg] of messages.entries()) {
     if (!msg || typeof msg !== "object") {
@@ -343,6 +348,10 @@ function buildAgentPrompt(
     if (role === "system" || role === "developer") {
       if (content) {
         systemParts.push(content);
+      }
+      // Detect cache_control on system messages
+      if (msg.cache_control && typeof msg.cache_control === "object") {
+        hasCacheControl = true;
       }
       continue;
     }
@@ -383,6 +392,7 @@ function buildAgentPrompt(
   return {
     message,
     extraSystemPrompt: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
+    hasCacheControl,
   };
 }
 
@@ -476,6 +486,7 @@ export async function handleOpenAiHttpRequest(
     sessionKey,
     runId,
     messageChannel,
+    streamParams: prompt.hasCacheControl ? { cacheRetention: "short" } : undefined,
   });
 
   if (!stream) {
