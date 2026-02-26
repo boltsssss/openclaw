@@ -2,7 +2,7 @@ node_modules
 **/node_modules/
 .env
 docker-compose.extra.yml
-dist
+# dist — included for fork install
 pnpm-lock.yaml
 bun.lock
 bun.lockb
