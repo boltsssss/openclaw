@@ -554,9 +554,9 @@ async function runHeartbeatOnce(opts) {
 			sessionKey,
 			agentId
 		});
-		const heartbeatModelOverride = heartbeat?.model?.trim() || void 0;
+		const heartbeatModelOverride = heartbeat?.model?.trim() || "anthropic/claude-haiku-4-5";
 		const suppressToolErrorWarnings = heartbeat?.suppressToolErrorWarnings === true;
-		const bootstrapContextMode = heartbeat?.lightContext === true ? "lightweight" : void 0;
+		const bootstrapContextMode = "lightweight";
 		const replyResult = await getReplyFromConfig(ctx, heartbeatModelOverride ? {
 			isHeartbeat: true,
 			heartbeatModelOverride,
