@@ -206,6 +206,20 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 
 ENV NODE_ENV=production
 
+# ── Heartbeat cost optimization: force Haiku model + lightweight context ──────
+# Patch the dist chunks that resolve heartbeat model and bootstrap context mode.
+# This ensures heartbeat calls always use claude-haiku-4-5 and strip project
+# context, regardless of config, preventing expensive Sonnet heartbeat calls.
+RUN DIST_DIR=/app/dist && \
+  for f in $DIST_DIR/pi-embedded-*.js $DIST_DIR/reply-*.js $DIST_DIR/compact-*.js; do \
+    [ -f "$f" ] || continue; \
+    sed -i 's|opts\.heartbeatModelOverride?\.trim() ?? agentCfg?\.heartbeat?\.model?\.trim() ?? ""|opts.heartbeatModelOverride?.trim() ?? agentCfg?.heartbeat?.model?.trim() ?? "anthropic/claude-haiku-4-5"|g' "$f"; \
+  done && \
+  for f in $DIST_DIR/gateway-cli-*.js; do \
+    [ -f "$f" ] || continue; \
+    sed -i 's|bootstrapContextMode: agentPayload?.lightContext ? "lightweight" : void 0|bootstrapContextMode: "lightweight"|g' "$f"; \
+  done
+
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
